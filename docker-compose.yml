@@ -1,0 +1,10 @@
+name: self-sync
+services:
+  dev-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: pgpassword
+      POSTGRES_DB: pgdb
+    ports:
+      - '5432:5432'
