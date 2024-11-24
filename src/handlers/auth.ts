@@ -31,11 +31,11 @@ authHandlers.post('/signin', zValidator('json', signInSchema), async (c) => {
   if (!isPasswordMatch)
     return c.json({ error: AuthErrors.InvalidCredentials }, 200);
 
-  const accessToken = await generateAccessToken({
+  const { token: accessToken, expires } = await generateAccessToken({
     sub: user[0].id,
   });
 
-  return c.json({ accessToken }, 200);
+  return c.json({ accessToken, expires }, 200);
 });
 
 authHandlers.post('/signup', zValidator('json', signUpSchema), async (c) => {
@@ -65,14 +65,14 @@ authHandlers.post('/signup', zValidator('json', signUpSchema), async (c) => {
   return c.text('OK', 201);
 });
 
-authHandlers.post('/refresh', authenticated, (c) => {
+authHandlers.post('/refresh', authenticated, async (c) => {
   const payload: JwtClaimsPayload = c.get('jwtPayload');
 
-  const accessToken = generateAccessToken({
+  const { token, expires } = await generateAccessToken({
     sub: payload.sub,
   });
 
-  return c.json({ accessToken }, 200);
+  return c.json({ accessToken: token, expires }, 200);
 });
 
 authHandlers.get('/me', authenticated, (c) => {

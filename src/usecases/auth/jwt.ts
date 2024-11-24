@@ -3,15 +3,15 @@ import { env } from '@/shared/env.js';
 import { Jwt } from 'hono/utils/jwt';
 import ms from 'ms';
 
-export async function generateAccessToken(
-  payload: JwtClaimsPayload
-): Promise<string> {
-  const exp = Date.now() + ms(env.JWT_EXPIRY);
+export async function generateAccessToken(payload: JwtClaimsPayload) {
+  const exp = Math.floor((Date.now() + ms(env.JWT_EXPIRY)) / 1000);
 
   payload = {
     ...payload,
-    exp: Math.floor(exp / 1000),
+    exp,
   };
 
-  return Jwt.sign(payload, env.JWT_SECRET);
+  const token = await Jwt.sign(payload, env.JWT_SECRET);
+
+  return { token, expires: exp };
 }
