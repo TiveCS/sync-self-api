@@ -1,5 +1,4 @@
-import { db } from '@/db/index.js';
-import { usersTable } from '@/db/schema.js';
+import { findUserByEmail, findUserById, insertUser } from '@/db/repo/users.js';
 import { AuthErrors } from '@/errors/auth.js';
 import { authenticated } from '@/middlewares/authenticated.js';
 import {
@@ -10,7 +9,6 @@ import {
 import { generateAccessToken } from '@/usecases/auth/jwt.js';
 import { zValidator } from '@hono/zod-validator';
 import { hash, verify } from '@node-rs/argon2';
-import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 export const authHandlers = new Hono();
@@ -18,21 +16,17 @@ export const authHandlers = new Hono();
 authHandlers.post('/signin', zValidator('json', signInSchema), async (c) => {
   const data = c.req.valid('json');
 
-  const user = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, data.email));
+  const user = await findUserByEmail(data.email);
 
-  if (user.length !== 1)
-    return c.json({ error: AuthErrors.InvalidCredentials }, 200);
+  if (!user) return c.json({ error: AuthErrors.InvalidCredentials }, 200);
 
-  const isPasswordMatch = await verify(user[0].password, data.password);
+  const isPasswordMatch = await verify(user.password, data.password);
 
   if (!isPasswordMatch)
     return c.json({ error: AuthErrors.InvalidCredentials }, 200);
 
   const { token: accessToken, expires } = await generateAccessToken({
-    sub: user[0].id,
+    sub: user.id,
   });
 
   return c.json({ accessToken, expires }, 200);
@@ -41,13 +35,9 @@ authHandlers.post('/signin', zValidator('json', signInSchema), async (c) => {
 authHandlers.post('/signup', zValidator('json', signUpSchema), async (c) => {
   const data = c.req.valid('json');
 
-  const user = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, data.email));
+  const user = await findUserByEmail(data.email);
 
-  if (user.length > 0)
-    return c.json({ error: AuthErrors.CredentialsTaken }, 200);
+  if (user) return c.json({ error: AuthErrors.CredentialsTaken }, 200);
 
   const hashedPassword = await hash(data.password, {
     memoryCost: 19456,
@@ -56,7 +46,7 @@ authHandlers.post('/signup', zValidator('json', signUpSchema), async (c) => {
     parallelism: 1,
   });
 
-  await db.insert(usersTable).values({
+  await insertUser({
     email: data.email,
     name: data.name,
     password: hashedPassword,
@@ -75,6 +65,12 @@ authHandlers.post('/refresh', authenticated, async (c) => {
   return c.json({ accessToken: token, expires }, 200);
 });
 
-authHandlers.get('/me', authenticated, (c) => {
-  return c.json(c.get('jwtPayload'));
+authHandlers.get('/me', authenticated, async (c) => {
+  const claims: JwtClaimsPayload = c.get('jwtPayload');
+
+  const user = await findUserById(claims.sub);
+
+  if (!user) return c.json({ error: AuthErrors.Unauthorized }, 401);
+
+  return c.json(user, 200);
 });
