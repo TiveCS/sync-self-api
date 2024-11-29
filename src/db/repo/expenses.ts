@@ -1,6 +1,7 @@
 import type {
   CreateExpenseDTO,
   EditExpenseDTO,
+  ExpenseOverview,
   FilterExpensesDTO,
 } from '@/models/expenses.js';
 import { and, asc, eq } from 'drizzle-orm';
@@ -13,7 +14,7 @@ export async function findExpenses({
 }: {
   filters: FilterExpensesDTO;
   userId: string;
-}) {
+}): Promise<ExpenseOverview[]> {
   return db.query.expensesTable.findMany({
     orderBy: [asc(expensesTable.occurredAt)],
     limit: filters.limit,
@@ -74,7 +75,7 @@ export async function insertExpense({
       amount: data.amount,
       category: data.category,
       note: data.note,
-      occurredAt: new Date(),
+      occurredAt: data.occurredAt,
       userId,
     })
     .returning({ id: expensesTable.id })
